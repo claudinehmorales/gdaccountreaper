@@ -1,0 +1,17 @@
+/**
+Service Information
+service: chromeless-serverless
+stage: dev
+region: us-west-2
+api keys:
+  dev-chromeless-session-key: FanbDgtzYfafE0XnPc5PL9hKtE7O5dcn7kOiXeod
+endpoints:
+  GET - https://p5tsc6fyah.execute-api.us-west-2.amazonaws.com/dev/version
+  OPTIONS - https://p5tsc6fyah.execute-api.us-west-2.amazonaws.com/dev/
+  GET - https://p5tsc6fyah.execute-api.us-west-2.amazonaws.com/dev/
+functions:
+  run: chromeless-serverless-dev-run
+  version: chromeless-serverless-dev-version
+  session: chromeless-serverless-dev-session
+  disconnect: chromeless-serverless-dev-disconnect
+**/
