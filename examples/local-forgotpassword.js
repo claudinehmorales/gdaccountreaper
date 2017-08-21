@@ -1,174 +1,89 @@
-const { Chromeless } = require('chromeless')
+const {Chromeless} = require('chromeless')
+const request = require('request-promise')
+const fs = require('fs')
+const path = require( 'path' );
 
+const timeout = ms => new Promise(res => setTimeout(res, ms))
 
 async function run() {
-    
+
   const chromeless = new Chromeless()
-  var captchaUrl = ''
-  
   const accountPage = 'https://console.aws.amazon.com/billing/home?#/account'
-  
-  var user = '' // aws account username
-    
-  const forgotPassword = await chromeless
-    
-    // Navigate to account page of the AWS Console
+  const user = 'jcv@amazon.com' // aws account username
+
+  await chromeless
     .goto(accountPage)
-    console.log('console login page open')
-    
-    // Click 'forgot password' button
-    await chromeless.click('#ap_signin1a_forgot_password_row > span:nth-child(2) > a:nth-child(1)') 
-    console.log('forgot password button clicked')
-    
-    // Type in email address in the email field
-    await chromeless.type(user, 'input[id="ap_email"]')
-    console.log('email typed')
-    
-    // Wait until captcha img is visible on the next page
-    await chromeless.wait('#ap_captcha_img')
-    console.log('captcha img visible on page')
-  
-    // Grab the src attribute of the captcha img
-    var captchaUrl = await chromeless.evaluate(() => {
-        var captchaImg = document.querySelector('#ap_captcha_img > img')
-        var captchaImgSrc = captchaImg.getAttribute('src')
-        return captchaImgSrc
+    .wait('#ap_signin1a_forgot_password_row')
+    .click('#ap_signin1a_forgot_password_row > span.ap_col2 > a')
+    .wait('#ap_captcha_img')
+    .type(user, 'input[id="ap_email"]')
+
+  // Wait until captcha img is visible on the next page
+  await chromeless.wait('#ap_captcha_img')
+  // Grab the src attribute of the captcha img
+  var captchaUrl = await chromeless.evaluate(() => {
+    var captchaImg = document.querySelector('#ap_captcha_img > img')
+    var captchaImgSrc = captchaImg.getAttribute('src')
+    return captchaImgSrc
   })
-  
-  console.log('captcha img url grabbed')
-    
+  console.log('captcha img url grabbed:', captchaUrl)
 
-    
-    
-    
-
-  var https = require('https') 
-  var writeCaptchaImgStream = require('fs')
-  
-  // GET the captcha img using the src grabbed above and the response to the GET request
-  var captchaGetRequest = https.get(captchaUrl, function(response) {
-      var captchaImgData = ''
-      response.setEncoding('binary')
-      response.on('data', function(chunk) {
-          
-          // append the actual body of the response to captchaImgData variable
-          captchaImgData += chunk
-      })
-      response.on('end', function() {
-          
-          // write the body of the response into a file called captcha.jpeg which will be saved locally
-          writeCaptchaImgStream.writeFile('captcha.jpeg', captchaImgData, 'binary', function(err) {
-              
-              // if there's an error writing to the stream, throw error
-              if(err) throw err
-              
-              // otherwise, log that the captcha img is saved locally
-              console.log('captcha img saved locally')
-              
-              // the next step is a POST to the Death By Captcha API 
-              var util = require('util')
-              var exec = require('child_process').exec
-              
-              // this is the curl request
-              var postCaptchaToDbc = 'curl --header "Expect: " -F username='' \ -F password='' \ -F captchafile=@captcha.jpeg \ http://api.dbcapi.me/api/captcha'
-    
-              // execute curl request to DBC API
-              child = exec(postCaptchaToDbc, function(error, stdout, stderr){
-                  console.log('captcha posted to dbc')
-
-                  // stringify stdout
-                  var stdoutStr = stdout.toString()
-
-                  // remove everything before 'captcha=' in stdoutStr 
-                  var stdoutSplit = stdoutStr.split('captcha=').pop()
-
-                  // remove everything after '&' in stdoutSplit to get the captchaId
-                  var captchaId = stdoutSplit.substring(0, stdoutSplit.indexOf('&'))
-                  console.log('captcha id value is ' + captchaId)
-                  
-
-                  // post a GET request to DBC for the solved captcha for this captchaId
-                  var http = require('http')
-                  var actualCaptchaWriteStream = require('fs')
-                  var breakCaptchaTxt
-                  var pollCaptchaUrl = 'http://api.dbcapi.me/api/captcha/' + captchaId + '/' 
-                  console.log(pollCaptchaUrl)
-                  
-                  
-                  function requestActualCaptchaTxt(url, callback) {
-                      
-                      var request = http.get(url, function(response) {
-                          response.on('data', function(chunk) {
-                              breakCaptchaTxt += chunk
-                              console.log(breakCaptchaTxt)
-                          })
-                          response.on('end', function() {
-                                  var actualCaptchaTxt = breakCaptchaTxt.split('text=').pop()
-                                  var finalCaptchaTxt = actualCaptchaTxt.substring(0, actualCaptchaTxt.indexOf('&'))
-                                  console.log('captcha solved is ' + finalCaptchaTxt)
-                                  actualCaptchaWriteStream.writeFile('finalCaptcha.txt', finalCaptchaTxt, function(err) {
-                                      console.log('finalCaptcha.txt saved locally')
-                                  if (err) throw err
-                              })
-                          })
-                      })
-                  }
-                  
-                  setTimeout(requestActualCaptchaTxt, 20000, pollCaptchaUrl)  
-                  
-
-                  
-                  
-                  
-                  
-                  
-
-        if(error !== null)
-        {
-            console.log('exec error: ' + error);
-        }
-        
-        });
-    })
+  // get captch image
+  const waitStream = fs.createWriteStream('captcha.jpg');
+  const response = await request(captchaUrl).pipe(waitStream);
+  await new Promise((resolve, reject) => {
+    waitStream.on('close', (err) => {
+      if (err) reject(err);
+      resolve();
     })
   })
-  
-  
-  
-  // CODE BELOW IS NOT EXECUTING AT ALL
-  await chromeless.evaluate(() => {
-                    console.log('IS THIS GETTING REACHED')
-                    function completePasswordRetrieval(text, callback) {
-                    
-                        var fs = require('fs')
-                        var path = process.cwd()
-                        var buffer = fs.readFileSync(path + '/finalCaptcha.txt')
-                        var captchaGuess = buffer.toString()
-                        console.log(captchaGuess)
-                    
-                    
-                        return async function typeCaptcha(text, callback) {
-                            await chromeless
-                            .type(captchaGuess, 'input[id="#ap_captcha_guess"]')
-                            .click('#continue-input')
-                            console.log('ddddddddd')
-                        
-                }
-                  setTimeout(completePasswordRetrieval, 18000, 'blah')
-                  
-            }
-        })
-  
+  // make request to dbc to decode
+  // success will return a 303 code which request interprets as an error
+  // so we catch the error and ignore it :)
+  let captchaRequestId = '';
+  try {
+    const dbcResponse1 = await request.post({
+      url: 'http://api.dbcapi.me/api/captcha',
+      formData: {
+        username: 'chmuser',
+        password: 'baconbacon',
+        captchafile: fs.createReadStream('captcha.jpg')
+      }
+    });
+  } catch (err) {
+    // extract the id from the location headers in the response
+    // location header looks like: http://api.dbcapi.me/api/captcha/165036720
+    captchaRequestId = path.parse(err.response.headers.location).name;
+    console.log('Location Id', captchaRequestId);    
+  }
+  // wait at least 3 seconds
+  console.log('Waiting 3 seconds...');
+  await timeout(3000);
+  // query response
+  let decodedCaptcha = '';
+  do {
+    try {
+      let dbcResponse2 = await request.get({
+        'url': `http://api.dbcapi.me/api/captcha/${captchaRequestId}`,
+        json: true
+      });
+      decodedCaptcha = dbcResponse2.text;
+    } catch(err) {
+      console.log('Captcha response not available yet', err);
+      await timeout(2000);
+    }
+  } while (!decodedCaptcha)
 
-  
+  console.log('Got captcha response:', decodedCaptcha);
 
-  
-    
-    
+  // type captcha
+  await chromeless
+    .type(decodedCaptcha, 'input[id="ap_captcha_guess"]')
+    .click('#continue-input')
 
-  console.log(forgotPassword) // prints local file path or S3 url
+  // more stuff?
 
-  //await chromeless.end() 
+  await chromeless.end() 
 }
 
 run().catch(console.error.bind(console))
